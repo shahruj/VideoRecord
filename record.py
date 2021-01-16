@@ -1,14 +1,13 @@
-import multiprocessing
+import threading
 import tkinter as tk
 import cv2
-
-e = multiprocessing.Event()
-p = None
-
+from collections import deque
+cap = cv2.VideoCapture(1,cv2.CAP_DSHOW)
+e = threading.Event()
+pr = None
+pw = None
 # -------begin capturing and saving video
-def startrecording(e):
-    cap = cv2.VideoCapture(1)
-    out = out = cv2.VideoWriter('outpy.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (640,480))
+def startrecording(e,queue,out,cap):
 
     while(cap.isOpened()):
         if e.is_set():
@@ -18,24 +17,37 @@ def startrecording(e):
             e.clear()
         ret, frame = cap.read()
         if ret==True:
-            out.write(frame)
+            queue.append(frame)
         else:
             break
+            
+def startwriting(e,queue,out,cap):
+    while not e.is_set():
+        if queue:
+            out.write(queue.popleft())
 
+def startinitialising(e,cap):
+    while not e.is_set():
+        if queue:
+            out.write(queue.popleft())
+            
 def start_recording_proc():
-    global p
-    p = multiprocessing.Process(target=startrecording, args=(e,))
-    p.start()
+    queue = deque()
+    out = cv2.VideoWriter('outpy.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 10, (640,480))
+    global pr
+    pw = threading.Thread(target=startwriting, args=(e,queue,out,cap))
+    pr = threading.Thread(target=startrecording, args=(e,queue,out,cap))
+    pw.start()
+    pr.start()
 
 # -------end video capture and stop tk
 def stoprecording():
     e.set()
-    p.join()
-
     root.quit()
     root.destroy()
 
 if __name__ == "__main__":
+
     # -------configure window
     root = tk.Tk()
     root.geometry("%dx%d+0+0" % (100, 100))
@@ -46,3 +58,8 @@ if __name__ == "__main__":
 
     # -------begin
     root.mainloop()
+    for i in range(0,100):
+        print(i)
+    cv2.destroyAllWindows()
+    
+    
